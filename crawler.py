@@ -5,14 +5,22 @@ import pandas as pd
 import requests
 import datetime
 
-def crawl(companyName): 
+def crawl(companyName, isKor=True): 
     options = webdriver.ChromeOptions()
     options.headless = True
     options.add_argument('window-size=1920x1080')
     options.add_argument("disable-gpu")
 
     driver = webdriver.Chrome('chromedriver', options=options)
-    url = f'https://news.google.com/rss/search?q={companyName}+when:1d&hl=ko&gl=KR&ceid=KR:ko'
+
+    if isKor:
+        country = ('ko', 'KR')
+        print(f'Start crawling for {companyName} in Google News Korea')
+    else:
+        country = ('en', 'EN')
+        print(f'Start crawling for {companyName} in Google News US')
+
+    url = f'https://news.google.com/rss/search?q={companyName}+when:1d&hl={country[0]}&gl={country[1]}&ceid={country[1]}:{country[0]}'
     driver.get(url)
     driver.implicitly_wait(3)
 
@@ -37,9 +45,14 @@ def crawl(companyName):
 
     data = {'title': titles, 'link': links, 'pubDate': pubDates, 'description': descriptions}
     data_frame = pd.DataFrame(data, columns=['title', 'link', 'pubDate', 'description'])
-    data_frame.to_csv('./news/' + companyName + '.csv')
+    data_frame.to_csv(f'./news/{country[1]}/{companyName}.csv')
+    print(f'Collected {len(titles)} articles!')
 
 if __name__=="__main__":
-    companyList = ['삼성전자', '한국조선해양', '하이트진로', '쿠콘']
-    for companyName in companyList:
-        crawl(companyName)
+    companyListK = ['삼성전자', '한국조선해양', '하이트진로', '쿠콘']
+    for companyName in companyListK:
+        crawl(companyName, True)
+
+    companyListUS = ['Apple', 'IBM', 'Delta Air Lines']
+    for companyName in companyListUS:
+        crawl(companyName, False)
