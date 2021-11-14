@@ -17,15 +17,13 @@ def crawl(companyName, isKor=True):
         country = ('ko', 'KR')
         print(f'Start crawling for {companyName} in Google News Korea')
     else:
-        country = ('en', 'EN')
+        country = ('en', 'US')
         print(f'Start crawling for {companyName} in Google News US')
 
     url = f'https://news.google.com/rss/search?q={companyName}+when:1d&hl={country[0]}&gl={country[1]}&ceid={country[1]}:{country[0]}'
     driver.get(url)
     driver.implicitly_wait(3)
-
     url = driver.current_url
-
     resp = requests.get(url)
     soup = bs(resp.text, 'xml')
 
@@ -35,7 +33,11 @@ def crawl(companyName, isKor=True):
     descriptions = []
 
     for item in soup.find_all('item'):
-        titles.append(item.title.string)
+        title = item.title.string 
+        source = item.source.string # 언론사
+        titles.append(title[:title.find(source) - 3]) 
+        # Possilbe problem: what if title contains the source at the very beginning?
+
         links.append(item.link.string)
         pubDates.append(item.pubDate.string)
 
@@ -46,7 +48,7 @@ def crawl(companyName, isKor=True):
     data = {'title': titles, 'link': links, 'pubDate': pubDates, 'description': descriptions}
     data_frame = pd.DataFrame(data, columns=['title', 'link', 'pubDate', 'description'])
     data_frame.to_csv(f'./news/{country[1]}/{companyName}.csv')
-    print(f'Collected {len(titles)} articles!')
+    print(f'Crawled {len(titles)} articles!')
 
 if __name__=="__main__":
     companyListK = ['삼성전자', '한국조선해양', '하이트진로', '쿠콘']
