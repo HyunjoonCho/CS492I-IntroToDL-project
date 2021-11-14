@@ -1,24 +1,24 @@
 from bs4 import BeautifulSoup as bs
-from selenium import webdriver
-from selenium.webdriver.common.keys import Keys
 import pandas as pd
 import requests
 import datetime
+import FinanceDataReader as fdr
 
-def loadData(driver, url):
-    driver.get(url)
-    driver.implicitly_wait(3)
-    url = driver.current_url
+def loadStockData(symbol, startDate, endDate):
+    df_stock = fdr.DataReader(symbol, startDate.isoformat(), endDate.isoformat())
+    df_stock = df_stock[['Close']]
+    df_stock['Fluctuation'] = df_stock['Close'].div(df_stock['Close'].shift(1)).apply(lambda x : (x - 1) * 100)
+    return df_stock
+
+def loadArticleData(url):
     resp = requests.get(url)
-    return bs(resp.text, 'xml')
 
-def parseToDataFrame(soup):
     titles = []
     links = []
     pubDates = []
     descriptions = []
 
-    for item in soup.find_all('item'):
+    for item in bs(resp.text, 'xml').find_all('item'):
         title = item.title.string 
         source = item.source.string # 언론사
         titles.append(title[:title.find(source) - 3]) 
@@ -37,34 +37,37 @@ def parseToDataFrame(soup):
 def crawl(companyName, startDate, endDate, isKor=True): 
     if isKor:
         country = ('ko', 'KR')
+        symbol = str(df_kospi.loc[df_kospi['Name'] == companyName]['Symbol'].values[0])
         print(f'Start crawling for {companyName} in Google News Korea')
     else:
         country = ('en', 'US')
+        symbol = df_snp.loc[df_snp['Name'] == companyName]['Symbol'].values[0]
         print(f'Start crawling for {companyName} in Google News US')
+
+    df_stock = loadStockData(symbol, startDate - datetime.timedelta(days=1), endDate)
+    df_stock.to_csv(f'./stock/{country[1]}/{companyName}_{startDate.isoformat()}_{endDate.isoformat()}.csv')
+    print(f'Loaded {companyName} price info, from {startDate.isoformat()} to {endDate.isoformat()}!')
     
     currentDate = startDate
     totalCount = 0
-    while currentDate != endDate:
+    while currentDate <= endDate:
         nextDate = currentDate + datetime.timedelta(days=1)
         url = f'https://news.google.com/rss/search?q={companyName}+after:{currentDate.isoformat()}+before:{nextDate.isoformat()}& \
                 hl={country[0]}&gl={country[1]}&ceid={country[1]}:{country[0]}'
-        soup = loadData(driver, url)
-        df, dailyCount = parseToDataFrame(soup)
+        df_articles, dailyCount = loadArticleData(url)
         totalCount += dailyCount
-        df.to_csv(f'./news/{country[1]}/{companyName}_{currentDate.isoformat()}.csv')
+        df_articles.to_csv(f'./news/{country[1]}/{companyName}_{currentDate.isoformat()}.csv')
         print(f'  {currentDate.isoformat()}: {dailyCount} articles')
         currentDate = nextDate
     print(f'Crawled {totalCount} articles in total!')
 
 if __name__=="__main__":
-    options = webdriver.ChromeOptions()
-    options.headless = True
-    options.add_argument('window-size=1920x1080')
-    options.add_argument("disable-gpu")
-    driver = webdriver.Chrome('chromedriver', options=options)
+    df_kospi = fdr.StockListing('KOSPI')
+    df_snp = fdr.StockListing('S&P500')
+    # May replace w/ fixed dictionary
 
     startDate = datetime.date(2020, 3, 3) # inclusive
-    endDate = datetime.date(2020, 3, 10) # exclusive
+    endDate = datetime.date(2020, 3, 10) # inclusive
     companyListK = ['삼성전자', '한국조선해양', '신세계']
     for companyName in companyListK:
         crawl(companyName, startDate, endDate)
