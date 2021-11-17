@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import datetime
 import FinanceDataReader as fdr
+from requests.adapters import HTTPAdapter
 
 def loadStockData(symbol, startDate, endDate):
     df_stock = fdr.DataReader(symbol, startDate.isoformat(), endDate.isoformat())
@@ -10,29 +11,26 @@ def loadStockData(symbol, startDate, endDate):
     df_stock['Fluctuation'] = df_stock['Close'].div(df_stock['Close'].shift(1)).apply(lambda x : (x - 1) * 100)
     return df_stock
 
-def loadArticleData(url):
+def aggregateTitles(companyName, url):
     resp = requests.get(url)
-
     titles = []
-    links = []
-    pubDates = []
-    descriptions = []
 
     for item in bs(resp.text, 'xml').find_all('item'):
-        title = item.title.string 
+        title = item.title.string
         source = item.source.string # 언론사
-        titles.append(title[:title.find(source) - 3]) 
-        # Possilbe problem: what if title contains the source at the very beginning?
+        titles.append(title[:title.find(source) - 3])
 
-        links.append(item.link.string)
-        pubDates.append(item.pubDate.string)
+    return ' '.join(titles)
 
-        # Description block has below format:
-        # <a href="https://..." target="_blank">2.3m ... - ...</a>&nbsp;&nbsp;<font color="#6f6f6f">...</font>
-        descriptions.append(item.description.string.split('>')[1].split('<')[0])
-
-    data = {'title': titles, 'link': links, 'pubDate': pubDates, 'description': descriptions}
-    return pd.DataFrame(data, columns=['title', 'link', 'pubDate', 'description']), len(titles)
+def classifyFluctuation(fluctuation):
+    if fluctuation < -2.5:
+        return 0
+    elif fluctuation < 0:
+        return 1
+    elif fluctuation < 2.5:
+        return 2
+    else:
+        return 3
 
 def crawl(companyName, startDate, endDate, isKor=True): 
     if isKor:
@@ -45,21 +43,22 @@ def crawl(companyName, startDate, endDate, isKor=True):
         print(f'Start crawling for {companyName} in Google News US')
 
     df_stock = loadStockData(symbol, startDate - datetime.timedelta(days=1), endDate)
-    df_stock.to_csv(f'./stock/{country[1]}/{companyName}_{startDate.isoformat()}_{endDate.isoformat()}.csv')
+    # df_stock.to_csv(f'./stock/{country[1]}/{companyName}_{startDate.isoformat()}_{endDate.isoformat()}.csv')
     print(f'Loaded {companyName} price info, from {startDate.isoformat()} to {endDate.isoformat()}!')
-    
-    currentDate = startDate
-    totalCount = 0
-    while currentDate <= endDate:
-        nextDate = currentDate + datetime.timedelta(days=1)
-        url = f'https://news.google.com/rss/search?q={companyName}+after:{currentDate.isoformat()}+before:{nextDate.isoformat()}& \
+
+    dateList = df_stock.index.map(lambda x: datetime.datetime.strftime(x, '%Y-%m-%d')).values
+    fluctuationList = df_stock.loc[:, 'Fluctuation'].values
+
+    idx = 1
+    while idx < len(dateList):
+        url = f'https://news.google.com/rss/search?q={companyName}+after:{dateList[idx - 1]}+before:{dateList[idx]}& \
                 hl={country[0]}&gl={country[1]}&ceid={country[1]}:{country[0]}'
-        df_articles, dailyCount = loadArticleData(url)
-        totalCount += dailyCount
-        df_articles.to_csv(f'./news/{country[1]}/{companyName}_{currentDate.isoformat()}.csv')
-        print(f'  {currentDate.isoformat()}: {dailyCount} articles')
-        currentDate = nextDate
-    print(f'Crawled {totalCount} articles in total!')
+        aggTitle = aggregateTitles(companyName, url)
+        if aggTitle:
+            with open(f'./exp/{classifyFluctuation(fluctuationList[idx])}/{companyName}_{dateList[idx]}.txt', 
+                        'w', encoding='UTF-8') as file:
+                file.write(aggTitle)
+        idx += 1
 
 if __name__=="__main__":
     df_kospi = fdr.StockListing('KOSPI')
@@ -67,11 +66,19 @@ if __name__=="__main__":
     # May replace w/ fixed dictionary
 
     startDate = datetime.date(2020, 3, 3) # inclusive
-    endDate = datetime.date(2020, 3, 10) # inclusive
-    companyListK = ['삼성전자', '한국조선해양', '신세계']
+    endDate = datetime.date(2020, 4, 16) # inclusive
+    companyListK = ['삼성전자', 'SK하이닉스', 'NAVER', '삼성바이오로직스', '카카오', 'LG화학', '삼성SDI', 
+                    '현대차', '기아', '셀트리온', '카카오뱅크', '크래프톤', 'POSCO', 'KB금융', '현대모비스', 
+                    '카카오페이', '삼성물산', 'SK이노베이션', 'LG전자', '신한지주', 'LG생활건강', 'SK바이오사이언스', 
+                    '하이브', '엔씨소프트', '한국전력', '삼성생명', '두산중공업', '하나금융지주', 'HMM', '삼성전기', 
+                    '삼성에스디에스', 'SK아이이테크놀로지', 'KT&G', '넷마블', '포스코케미칼', '아모레퍼시픽', '삼성화재', 
+                    '대한항공', 'S-Oil', '우리금융지주', '현대중공업', '고려아연', '기업은행', 'KT', 'SK바이오팜', 'LG디스플레이', '한온시스템']
+    # 우리금융지주 수집 중 "Remote end closed connection without" urllib3.exceptions.ProtocolError: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+    # KOSPI 시총 상위 50개 종목, 지주회사 제외
+
     for companyName in companyListK:
         crawl(companyName, startDate, endDate)
 
-    companyListUS = ['Apple', 'IBM', 'Delta Air Lines']
-    for companyName in companyListUS:
-        crawl(companyName, startDate, endDate, False)
+    # companyListUS = ['Apple', 'IBM', 'Delta Air Lines']
+    # for companyName in companyListUS:
+    #     crawl(companyName, startDate, endDate, False)
