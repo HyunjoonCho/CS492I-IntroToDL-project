@@ -3,7 +3,7 @@ import pandas as pd
 import requests
 import datetime
 import FinanceDataReader as fdr
-from requests.adapters import HTTPAdapter
+import OpenDartReader as odr
 
 def loadStockData(symbol, startDate, endDate):
     df_stock = fdr.DataReader(symbol, startDate.isoformat(), endDate.isoformat())
@@ -32,7 +32,7 @@ def classifyFluctuation(fluctuation):
     else:
         return 3
 
-def crawl(companyName, startDate, endDate, isKor=True): 
+def crawl_news(companyName, startDate, endDate, isKor=True): 
     if isKor:
         country = ('ko', 'KR')
         symbol = str(df_kospi.loc[df_kospi['Name'] == companyName]['Symbol'].values[0])
@@ -60,6 +60,24 @@ def crawl(companyName, startDate, endDate, isKor=True):
                 file.write(aggTitle)
         idx += 1
 
+def crawl_disclosure_k(companyName, startDate, endDate):
+    print(f'Start crawling for {companyName} in DART')
+    api_key = '' # create your own api key then paste
+    dart = odr(api_key)
+    df_disclosure = dart.list(companyName, start=startDate, end=endDate)
+    if not df_disclosure.empty:
+        df_disclosure = df_disclosure[['report_nm', 'rcept_no']]
+        df_disclosure = df_disclosure[~df_disclosure['report_nm'].str.contains('기재정정')] # TODO: exclude or not?
+        df_disclosure['rcept_no'] = df_disclosure['rcept_no'].apply(lambda x : datetime.date(int(x[:4]), int(x[4:6]), int(x[6:8])))
+
+        symbol = str(df_kospi.loc[df_kospi['Name'] == companyName]['Symbol'].values[0])
+        df_stock = loadStockData(symbol, startDate - datetime.timedelta(days=1), endDate)
+        print(f'Loaded {companyName} price info, from {startDate.isoformat()} to {endDate.isoformat()}!')
+
+        dateList = df_stock.index.map(lambda x: datetime.datetime.strftime(x, '%Y-%m-%d')).values
+        fluctuationList = df_stock.loc[:, 'Fluctuation'].values
+        dailyFluctuationDict = dict(zip(dateList, fluctuationList))
+
 if __name__=="__main__":
     df_kospi = fdr.StockListing('KOSPI')
     df_snp = fdr.StockListing('S&P500')
@@ -77,7 +95,7 @@ if __name__=="__main__":
     # KOSPI 시총 상위 50개 종목, 지주회사 제외
 
     for companyName in companyListK:
-        crawl(companyName, startDate, endDate)
+        crawl_news(companyName, startDate, endDate)
 
     # companyListUS = ['Apple', 'IBM', 'Delta Air Lines']
     # for companyName in companyListUS:
