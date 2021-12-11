@@ -5,10 +5,12 @@ import requests
 import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
+import web_helper
 
 st.title('Investement Advisor')
 df_kospi = fdr.StockListing('KOSPI')
-fluctuation_category = ['Big Drop', 'Slight Drop', 'Slight Jump', 'Big Jump']
+fluctuation_category = ['Big Drop...', 'Slight Drop..', 'Slight Jump!!', 'Big Jump!!']
+helper = web_helper.WebHelper()
 
 def get_ticker(company_name):
     return str(df_kospi.loc[df_kospi['Name'] == company_name]['Symbol'].values[0])
@@ -34,9 +36,8 @@ def load_news_data(company_name, last_trading_day, predict_date):
         title = item.title.string
         link = item.link.string
         source = item.source.string # 언론사
-        if company_name in title:
+        if helper.filter_by_category(company_name, title):
             articles.append((title[:title.find(source) - 3], link))
-            # TODO: Add category filter
 
     return articles
 
@@ -91,6 +92,6 @@ with col2:
     prediction_state = st.text('Now Predicting...')
     chart_pred = predict_on_chart(stock_price_data)
     news_pred = predict_on_news(articles)
-    prediction_state.text('Done!')
-    st.write(f'Based on Chart    {fluctuation_category[chart_pred]}')
-    st.write(f'Based on Article  {fluctuation_category[news_pred]}')
+    prediction_state.text('Prediction Result')
+    st.write(f'Based on Chart, {fluctuation_category[chart_pred]}')
+    st.write(f'Based on Article, {fluctuation_category[news_pred]}')
