@@ -1,3 +1,4 @@
 *.exe
 docs_cache/
 *.ckpt
+__pycache__/
