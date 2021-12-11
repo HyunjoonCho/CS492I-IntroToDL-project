@@ -1,2 +1,3 @@
 *.exe
 docs_cache/
+*.ckpt
