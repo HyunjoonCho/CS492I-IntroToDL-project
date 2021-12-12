@@ -9,7 +9,7 @@ import web_helper
 
 st.title('Investement Advisor')
 df_kospi = fdr.StockListing('KOSPI')
-fluctuation_category = ['Big Drop...', 'Slight Drop..', 'Slight Jump!!', 'Big Jump!!']
+fluctuation_category = ['Big Drop...', 'Slight Drop..', 'Slight Jump!', 'Big Jump!!']
 helper = web_helper.WebHelper()
 
 def get_ticker(company_name):
@@ -42,8 +42,8 @@ def load_news_data(company_name, last_trading_day, predict_date):
     return articles
 
 def predict_on_news(articles):
-    # TODO: need implementation
-    return 3
+    aggregated_titles = ' '.join([headline for headline, _ in articles])
+    return helper.predict_fluctuation(aggregated_titles)
 
 def predict_on_chart(stock_price_data):
     # TODO: need implementation (modularize)
@@ -91,7 +91,8 @@ with col2:
     st.subheader('Our Prediction')
     prediction_state = st.text('Now Predicting...')
     chart_pred = predict_on_chart(stock_price_data)
-    news_pred = predict_on_news(articles)
+    news_pred, news_confidence = predict_on_news(articles)
     prediction_state.text('Prediction Result')
-    st.write(f'Based on Chart, {fluctuation_category[chart_pred]}')
-    st.write(f'Based on Article, {fluctuation_category[news_pred]}')
+    st.write(f'Based on Chart, **{fluctuation_category[chart_pred]}**')
+    st.write(f'Based on Article, **{fluctuation_category[news_pred]}**')
+    st.write(f'We are **{news_confidence:.2f}%** confident')
