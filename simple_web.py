@@ -21,7 +21,7 @@ def get_last_traiding_day(stock_price_data):
 @st.cache
 def load_stock_price_data(ticker, predict_date):
     df_stock = fdr.DataReader(ticker, predict_date - datetime.timedelta(days=40), predict_date- datetime.timedelta(days=1))
-    df_stock = df_stock[-19:]
+    df_stock = df_stock[-20:]
     df_closing = df_stock[['Close']]
     return df_closing
 
@@ -43,11 +43,10 @@ def load_news_data(company_name, last_trading_day, predict_date):
 
 def predict_on_news(articles):
     aggregated_titles = ' '.join([headline for headline, _ in articles])
-    return helper.predict_fluctuation(aggregated_titles)
+    return helper.predict_fluctuation_by_news(aggregated_titles)
 
-def predict_on_chart(stock_price_data):
-    # TODO: need implementation (modularize)
-    return 3
+def predict_on_chart(ticker, stock_price_data):
+    return helper.predict_fluctuation_by_chart(ticker, stock_price_data)
 
 company_name = st.text_input('Company Name', '삼성전자')
 year = int(st.text_input('Year', '2021'))
@@ -90,9 +89,10 @@ with col2:
 
     st.subheader('Our Prediction')
     prediction_state = st.text('Now Predicting...')
-    chart_pred = predict_on_chart(stock_price_data)
+    chart_pred, predicted_price = predict_on_chart(get_ticker(company_name), stock_price_data)
     news_pred, news_confidence = predict_on_news(articles)
     prediction_state.text('Prediction Result')
     st.write(f'Based on Chart, **{fluctuation_category[chart_pred]}**')
+    st.write(f'To be more specific, **{predicted_price}won**')    
     st.write(f'Based on Article, **{fluctuation_category[news_pred]}**')
     st.write(f'We are **{news_confidence:.2f}%** confident')
