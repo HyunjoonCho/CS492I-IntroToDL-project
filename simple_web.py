@@ -18,14 +18,12 @@ def get_ticker(company_name):
 def get_last_traiding_day(stock_price_data):
     return stock_price_data.index.map(lambda x: datetime.datetime.strftime(x, '%Y-%m-%d')).values[-1]
 
-@st.cache
 def load_stock_price_data(ticker, predict_date):
     df_stock = fdr.DataReader(ticker, predict_date - datetime.timedelta(days=40), predict_date- datetime.timedelta(days=1))
     df_stock = df_stock[-20:]
     df_closing = df_stock[['Close']]
     return df_closing
 
-@st.cache
 def load_news_data(company_name, last_trading_day, predict_date):
     url = f'https://news.google.com/rss/search?q={company_name}+after:{last_trading_day}+before:{predict_date}& \
             hl=ko&gl=KR&ceid=KR:ko'
@@ -51,13 +49,13 @@ def predict_on_chart(ticker, stock_price_data):
 company_name = st.text_input('Company Name', '삼성전자')
 year = int(st.text_input('Year', '2021'))
 month = int(st.text_input('Month', '12'))
-date = int(st.text_input('Date', '13'))
+date = int(st.text_input('Date', '17'))
 predict_date = datetime.date(year, month, date)
 
 data_load_state = st.text('Loading data...')
 stock_price_data = load_stock_price_data(get_ticker(company_name), predict_date)
 articles = load_news_data(company_name, get_last_traiding_day(stock_price_data), predict_date)
-data_load_state.text("Done! (using st.cache)")
+data_load_state.text("Data Loaded!")
 
 st.subheader(f'{company_name} on {predict_date.isoformat()}')
 

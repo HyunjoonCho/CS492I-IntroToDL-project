@@ -131,6 +131,9 @@ class WebHelper:
     def filter_by_category(self, company_name, headline):
         if company_name in headline :
             processed_headline = re.sub(company_name, '', str(headline.encode('utf-8')))
+            if len(processed_headline) > 512:
+                print(f'[Headline] {headline} [Category] Too Long to clf')
+                return False
             pred, confidence = self._apply_model(processed_headline, self.bert_category_clf)
             cate = ["정치","경제","사회", "생활/문화","세계","기술/IT", "연예", "스포츠"]
             print(f'[Headline] {headline} [Category] {cate[pred]} [Confidence] {confidence:.2f}')
